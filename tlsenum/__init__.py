@@ -74,14 +74,11 @@ def send_sslv2_client_hello(host, port):
 
 @click.command(context_settings=CONTEXT_SETTINGS)
 @click.argument("host", type=click.STRING)
-@click.argument("port", type=click.INT)
-def cli(host, port):
-    """
-    A command line tool to enumerate TLS cipher-suites supported by a server.
+def cli(host):
+    print("Reading input file and parsing list of websites");
 
-    """
+def create_client_hello():
     cipher_suites_list = [i.name for i in CipherSuites]
-
     extension = Extensions()
     extension.sni = host
     extension.ec_curves = [i.name for i in ECCurves]
@@ -92,36 +89,13 @@ def cli(host, port):
     client_hello.extensions = extension.build()
     client_hello.cipher_suites = cipher_suites_list
 
-    supported_tls_versions = []
-
-    try:
-        send_sslv2_client_hello(host, port)
-        supported_tls_versions.append("2.0")
-    except HandshakeFailure:
-        pass
-
-    for i in TLSProtocolVersion:
-        client_hello.protocol_version = i
-        try:
-            server_hello = send_client_hello(host, port, client_hello.build())
-            server_hello = ServerHello.parse_server_hello(server_hello)
-        except HandshakeFailure:
-            continue
-
-        supported_tls_versions.append(server_hello.protocol_version)
-
-    supported_tls_versions = sorted(
-        list(set(supported_tls_versions)),
-        key=lambda x: 0 if x == "2.0" else TLSProtocolVersion.index(x) + 1
-    )
-
-    print("TLS Versions supported by server: {0}".format(
-        ", ".join(supported_tls_versions)
-    ))
-
-    client_hello.protocol_version = supported_tls_versions[-1]
+    client_hello.protocol_version = protocol_version
     client_hello.deflate = True
+    return client_hello
 
+
+def get_supported_cipher_suites(host, port, protocol_version):
+    client_hello = create_client_hello();
     try:
         server_hello = send_client_hello(host, port, client_hello.build())
         server_hello = ServerHello.parse_server_hello(server_hello)
@@ -148,6 +122,51 @@ def cli(host, port):
 
         supported_cipher_suites.append(server_hello.cipher_suite)
         cipher_suites_list.remove(server_hello.cipher_suite)
+    return supported_cipher_suites;
 
+
+def get_supported_tls_versions(host, port):
+    cipher_suites_list = [i.name for i in CipherSuites]
+
+    client_hello = create_client_hello();
+
+    supported_tls_versions = []
+
+    try:
+        send_sslv2_client_hello(host, port)
+        supported_tls_versions.append("2.0")
+    except HandshakeFailure:
+        pass
+
+    for i in TLSProtocolVersion:
+        client_hello.protocol_version = i
+        try:
+            server_hello = send_client_hello(host, port, client_hello.build())
+            server_hello = ServerHello.parse_server_hello(server_hello)
+        except HandshakeFailure:
+            continue
+
+        supported_tls_versions.append(server_hello.protocol_version)
+
+    supported_tls_versions = sorted(
+        list(set(supported_tls_versions)),
+        key=lambda x: 0 if x == "2.0" else TLSProtocolVersion.index(x) + 1
+    )
+    return supported_tls_versions;
+
+
+@click.command(context_settings=CONTEXT_SETTINGS)
+@click.argument("host", type=click.STRING)
+@click.argument("port", type=click.INT)
+def cli(host, port):
+    """
+    A command line tool to enumerate TLS cipher-suites supported by a server.
+
+    """
+    supported_tls_versions = get_supported_tls_versions(host, port)
+    print("TLS Versions supported by server: {0}".format(
+        ", ".join(supported_tls_versions)
+    ))
+    supported_cipher_suites = get_supported_cipher_suites(host, port, supported_tls_versions[-1])
     for i in supported_cipher_suites:
         print(i)
