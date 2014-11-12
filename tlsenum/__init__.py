@@ -74,46 +74,6 @@ def send_sslv2_client_hello(host, port):
         raise HandshakeFailure()
 
 
-@click.command(context_settings=CONTEXT_SETTINGS)
-@click.argument("file_name", type=click.STRING)
-def cli2(file_name):
-    print("Reading input file and parsing list of websites");
-    tls_versions = parsedDictionary()
-    cipher_suites = parsedDictionary()
-
-    f = open(file_name, "r" )
-    lines = [line.rstrip('\n') for line in f]
-    f.close()
-    
-    for i in range(0, len(lines)):
-      host = lines[i]
-      port = 443
-      cipher_suites_list = [i.name for i in CipherSuites]
-
-      extension = Extensions()
-      extension.sni = host
-      extension.ec_curves = [i.name for i in ECCurves]
-      extension.ec_point_format = [i.name for i in ECPointFormat]
-
-      client_hello = ClientHello()
-      client_hello.deflate = False
-      client_hello.extensions = extension.build()
-      client_hello.cipher_suites = cipher_suites_list
-      supported_tls_versions = get_supported_tls_versions(host, port, client_hello)
-      if len(supported_tls_versions) > 0:
-
-        tls_versions.add_list(supported_tls_versions)
-
-        client_hello.protocol_version = supported_tls_versions[-1]
-        client_hello.deflate = True
-
-        supported_cipher_suites = get_supported_cipher_suites(host, port, client_hello, cipher_suites_list)
-        cipher_suites.add_list(supported_cipher_suites)
-    tls_versions.sortByValue()
-    cipher_suites.sortByValue()
-    print(cipher_suites.Dict)
-    print(tls_versions.Dict)
-
 
 def get_supported_cipher_suites(host, port, client_hello, cipher_suites_list):
     supported_cipher_suites = []
@@ -134,7 +94,7 @@ def get_supported_cipher_suites(host, port, client_hello, cipher_suites_list):
         try:
             server_hello = send_client_hello(host, port, client_hello.build())
             server_hello = ServerHello.parse_server_hello(server_hello)
-        except HandshakeFailure:
+        except (HandshakeFailure, ValueError) as e:
             break
 
         supported_cipher_suites.append(server_hello.cipher_suite)
@@ -156,7 +116,7 @@ def get_supported_tls_versions(host, port, client_hello):
         try:
             server_hello = send_client_hello(host, port, client_hello.build())
             server_hello = ServerHello.parse_server_hello(server_hello)
-        except HandshakeFailure:
+        except(HandshakeFailure, ValueError) as e:
             continue
 
         supported_tls_versions.append(server_hello.protocol_version)
@@ -168,6 +128,29 @@ def get_supported_tls_versions(host, port, client_hello):
     return supported_tls_versions;
 
 
+def get_tls_and_ciphers(host, port):
+      cipher_suites_list = [i.name for i in CipherSuites]
+      supported_cipher_suites = [];
+      supported_tls_versions = [];
+
+      extension = Extensions()
+      extension.sni = host
+      extension.ec_curves = [i.name for i in ECCurves]
+      extension.ec_point_format = [i.name for i in ECPointFormat]
+
+      client_hello = ClientHello()
+      client_hello.deflate = False
+      client_hello.extensions = extension.build()
+      client_hello.cipher_suites = cipher_suites_list
+      supported_tls_versions = get_supported_tls_versions(host, port, client_hello)
+
+      if len(supported_tls_versions) > 0:
+        client_hello.protocol_version = supported_tls_versions[-1]
+        client_hello.deflate = True
+
+        supported_cipher_suites = get_supported_cipher_suites(host, port, client_hello, cipher_suites_list)
+      return supported_cipher_suites, supported_tls_versions
+ 
 @click.command(context_settings=CONTEXT_SETTINGS)
 @click.argument("host", type=click.STRING)
 @click.argument("port", type=click.INT)
@@ -176,27 +159,37 @@ def cli(host, port):
     A command line tool to enumerate TLS cipher-suites supported by a server.
 
     """
-    cipher_suites_list = [i.name for i in CipherSuites]
 
-    extension = Extensions()
-    extension.sni = host
-    extension.ec_curves = [i.name for i in ECCurves]
-    extension.ec_point_format = [i.name for i in ECPointFormat]
-
-    client_hello = ClientHello()
-    client_hello.deflate = False
-    client_hello.extensions = extension.build()
-    client_hello.cipher_suites = cipher_suites_list
-
-    supported_tls_versions = get_supported_tls_versions(host, port, client_hello)
+    supported_cipher_suites, supported_tls_versions = get_tls_and_ciphers(host, port)
     print("TLS Versions supported by server: {0}".format(
         ", ".join(supported_tls_versions)
     ))
 
-    client_hello.protocol_version = supported_tls_versions[-1]
-    client_hello.deflate = True
-
-    supported_cipher_suites = get_supported_cipher_suites(host, port, client_hello, cipher_suites_list)
     print("Supported Cipher suites in order of priority: ")
     for i in supported_cipher_suites:
         print(i)
+        
+@click.command(context_settings=CONTEXT_SETTINGS)
+@click.argument("file_name", type=click.STRING)
+def cli2(file_name):
+    print("Reading input file and parsing list of websites");
+    tls_versions = parsedDictionary()
+    cipher_suites = parsedDictionary()
+
+    f = open(file_name, "r" )
+    lines = [line.rstrip('\n') for line in f]
+    f.close()
+
+    for i in range(0, len(lines)):
+        host = lines[i]
+        port = 443
+        supported_cipher_suites, supported_tls_versions = get_tls_and_ciphers(host, port)
+        tls_versions.add_list(supported_tls_versions)
+        cipher_suites.add_list(supported_cipher_suites)
+
+    tls_versions.sortByValue()
+    cipher_suites.sortByValue()
+    print(cipher_suites.Dict)
+    print(tls_versions.Dict)
+
+
