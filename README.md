@@ -20,7 +20,14 @@ Installation
 `tlsenum` can be used with Python 2.7, 3.3 or 3.4 and can be installed with
 pip.
 
-    $ pip install tlsenum
+    $ pip install tlsenum 
+    
+To make local changes to the code and install tlsenum.
+    
+    $ pip install -r dev-requirements.txt
+    $ python setup.py develop
+
+
 
 Usage
 -----
