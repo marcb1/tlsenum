@@ -4,6 +4,8 @@ import socket
 
 import click
 
+from tlsenum.parsedDictionary import parsedDictionary
+
 from construct import UBInt16
 
 from tlsenum.parse_hello import (
@@ -73,29 +75,49 @@ def send_sslv2_client_hello(host, port):
 
 
 @click.command(context_settings=CONTEXT_SETTINGS)
-@click.argument("host", type=click.STRING)
-def cli(host):
+@click.argument("file_name", type=click.STRING)
+def cli2(file_name):
     print("Reading input file and parsing list of websites");
+    tls_versions = parsedDictionary()
+    cipher_suites = parsedDictionary()
 
-def create_client_hello():
-    cipher_suites_list = [i.name for i in CipherSuites]
-    extension = Extensions()
-    extension.sni = host
-    extension.ec_curves = [i.name for i in ECCurves]
-    extension.ec_point_format = [i.name for i in ECPointFormat]
+    f = open(file_name, "r" )
+    lines = [line.rstrip('\n') for line in f]
+    f.close()
+    
+    for i in range(0, len(lines)):
+      host = lines[i]
+      port = 443
+      cipher_suites_list = [i.name for i in CipherSuites]
 
-    client_hello = ClientHello()
-    client_hello.deflate = False
-    client_hello.extensions = extension.build()
-    client_hello.cipher_suites = cipher_suites_list
+      extension = Extensions()
+      extension.sni = host
+      extension.ec_curves = [i.name for i in ECCurves]
+      extension.ec_point_format = [i.name for i in ECPointFormat]
 
-    client_hello.protocol_version = protocol_version
-    client_hello.deflate = True
-    return client_hello
+      client_hello = ClientHello()
+      client_hello.deflate = False
+      client_hello.extensions = extension.build()
+      client_hello.cipher_suites = cipher_suites_list
+      supported_tls_versions = get_supported_tls_versions(host, port, client_hello)
+      if len(supported_tls_versions) > 0:
+
+        tls_versions.add_list(supported_tls_versions)
+
+        client_hello.protocol_version = supported_tls_versions[-1]
+        client_hello.deflate = True
+
+        supported_cipher_suites = get_supported_cipher_suites(host, port, client_hello, cipher_suites_list)
+        cipher_suites.add_list(supported_cipher_suites)
+    tls_versions.sortByValue()
+    cipher_suites.sortByValue()
+    print(cipher_suites.Dict)
+    print(tls_versions.Dict)
 
 
-def get_supported_cipher_suites(host, port, protocol_version):
-    client_hello = create_client_hello();
+def get_supported_cipher_suites(host, port, client_hello, cipher_suites_list):
+    supported_cipher_suites = []
+
     try:
         server_hello = send_client_hello(host, port, client_hello.build())
         server_hello = ServerHello.parse_server_hello(server_hello)
@@ -108,12 +130,7 @@ def get_supported_cipher_suites(host, port, protocol_version):
 
     client_hello.deflate = False
 
-    supported_cipher_suites = []
-
-    print("Supported Cipher suites in order of priority: ")
-
     while True:
-        client_hello.cipher_suites = cipher_suites_list
         try:
             server_hello = send_client_hello(host, port, client_hello.build())
             server_hello = ServerHello.parse_server_hello(server_hello)
@@ -125,11 +142,7 @@ def get_supported_cipher_suites(host, port, protocol_version):
     return supported_cipher_suites;
 
 
-def get_supported_tls_versions(host, port):
-    cipher_suites_list = [i.name for i in CipherSuites]
-
-    client_hello = create_client_hello();
-
+def get_supported_tls_versions(host, port, client_hello):
     supported_tls_versions = []
 
     try:
@@ -163,10 +176,27 @@ def cli(host, port):
     A command line tool to enumerate TLS cipher-suites supported by a server.
 
     """
-    supported_tls_versions = get_supported_tls_versions(host, port)
+    cipher_suites_list = [i.name for i in CipherSuites]
+
+    extension = Extensions()
+    extension.sni = host
+    extension.ec_curves = [i.name for i in ECCurves]
+    extension.ec_point_format = [i.name for i in ECPointFormat]
+
+    client_hello = ClientHello()
+    client_hello.deflate = False
+    client_hello.extensions = extension.build()
+    client_hello.cipher_suites = cipher_suites_list
+
+    supported_tls_versions = get_supported_tls_versions(host, port, client_hello)
     print("TLS Versions supported by server: {0}".format(
         ", ".join(supported_tls_versions)
     ))
-    supported_cipher_suites = get_supported_cipher_suites(host, port, supported_tls_versions[-1])
+
+    client_hello.protocol_version = supported_tls_versions[-1]
+    client_hello.deflate = True
+
+    supported_cipher_suites = get_supported_cipher_suites(host, port, client_hello, cipher_suites_list)
+    print("Supported Cipher suites in order of priority: ")
     for i in supported_cipher_suites:
         print(i)

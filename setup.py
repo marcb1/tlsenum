@@ -2,6 +2,9 @@ from __future__ import absolute_import, division, print_function
 
 from setuptools import setup, find_packages
 
+console_scripts = ['tlsenum=tlsenum:cli',
+    'tlsenum_parse=tlsenum:cli2']
+
 setup(
     name="tlsenum",
     description="A TLS ciphersuite enumeration tool.",
@@ -13,10 +16,7 @@ setup(
         "idna",
         "six"
     ],
-    entry_points="""
-        [console_scripts]
-        tlsenum=tlsenum:cli
-    """,
+    entry_points=dict(console_scripts=console_scripts),
     packages=find_packages(exclude=["tests*"]),
     license="MIT",
     url="https://github.com/Ayrx/tlsenum",
