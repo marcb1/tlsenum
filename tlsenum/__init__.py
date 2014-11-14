@@ -84,9 +84,10 @@ def get_supported_cipher_suites(host, port, client_hello, cipher_suites_list):
     except HandshakeFailure:
         pass
 
-#    print("Deflate compression: {0}".format(
-#        "Yes" if server_hello.deflate else "No"
-#    ))
+    if server_hello.deflate:
+        support_cipher_suites.append("deflate")
+    else:
+        supported_cipher_suites.append("no_deflate")
 
     client_hello.deflate = False
 
@@ -99,6 +100,7 @@ def get_supported_cipher_suites(host, port, client_hello, cipher_suites_list):
 
         supported_cipher_suites.append(server_hello.cipher_suite)
         cipher_suites_list.remove(server_hello.cipher_suite)
+
     return supported_cipher_suites;
 
 
@@ -151,15 +153,14 @@ def get_tls_and_ciphers(host, port):
         supported_cipher_suites = get_supported_cipher_suites(host, port, client_hello, cipher_suites_list)
       return supported_cipher_suites, supported_tls_versions
  
+
 @click.command(context_settings=CONTEXT_SETTINGS)
 @click.argument("host", type=click.STRING)
 @click.argument("port", type=click.INT)
 def cli(host, port):
     """
     A command line tool to enumerate TLS cipher-suites supported by a server.
-
     """
-
     supported_cipher_suites, supported_tls_versions = get_tls_and_ciphers(host, port)
     print("TLS Versions supported by server: {0}".format(
         ", ".join(supported_tls_versions)
@@ -168,11 +169,15 @@ def cli(host, port):
     print("Supported Cipher suites in order of priority: ")
     for i in supported_cipher_suites:
         print(i)
-        
+
+
 @click.command(context_settings=CONTEXT_SETTINGS)
 @click.argument("file_name", type=click.STRING)
 def cli2(file_name):
-    print("Reading input file and parsing list of websites");
+    """
+    A command line tool to enumerate TLS cipher-suites supported by a server from a file with a list of servers.
+    """
+    print("Reading input file and parsing list of websites.");
     tls_versions = parsedDictionary()
     cipher_suites = parsedDictionary()
 
@@ -183,7 +188,7 @@ def cli2(file_name):
     for i in range(0, len(lines)):
         host = lines[i]
         port = 443
-        print(lines[i])
+        print("Enumerating tls ciphers: " + lines[i])
         supported_cipher_suites, supported_tls_versions = get_tls_and_ciphers(host, port)
         tls_versions.add_list(supported_tls_versions)
         cipher_suites.add_list(supported_cipher_suites)
@@ -192,5 +197,3 @@ def cli2(file_name):
     cipher_suites.sortByValue()
     print(cipher_suites.Dict)
     print(tls_versions.Dict)
-
-
