@@ -84,9 +84,9 @@ def get_supported_cipher_suites(host, port, client_hello, cipher_suites_list):
     except HandshakeFailure:
         pass
 
-    print("Deflate compression: {0}".format(
-        "Yes" if server_hello.deflate else "No"
-    ))
+#    print("Deflate compression: {0}".format(
+#        "Yes" if server_hello.deflate else "No"
+#    ))
 
     client_hello.deflate = False
 
@@ -183,6 +183,7 @@ def cli2(file_name):
     for i in range(0, len(lines)):
         host = lines[i]
         port = 443
+        print(lines[i])
         supported_cipher_suites, supported_tls_versions = get_tls_and_ciphers(host, port)
         tls_versions.add_list(supported_tls_versions)
         cipher_suites.add_list(supported_cipher_suites)
