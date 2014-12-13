@@ -85,9 +85,9 @@ def get_supported_cipher_suites(host, port, client_hello, cipher_suites_list):
         pass
 
     if server_hello.deflate:
-        support_cipher_suites.append("deflate")
+        support_cipher_suites.append("Deflate: supported")
     else:
-        supported_cipher_suites.append("no_deflate")
+        supported_cipher_suites.append("Deflate: not supported")
 
     client_hello.deflate = False
 
